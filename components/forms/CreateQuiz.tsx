@@ -17,6 +17,9 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { BookOpen, CopyCheck } from "lucide-react";
 import { Separator } from "../ui/separator";
+import axios, { AxiosError } from "axios";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -31,7 +34,14 @@ type Props = {
 
 type Input = z.infer<typeof quizCreationSchema>;
 
-const CreateQuiz = ({ topic: topicParam }: Props) => {
+const QuizCreation = ({ topic: topicParam }: Props) => {
+  const router = useRouter();
+  const { mutate: getQuestions, isLoading } = useMutation({
+    mutationFn: async ({ amount, topic, type }: Input) => {
+      const response = await axios.post("/api/game", { amount, topic, type });
+      return response.data;
+    },
+  });
 
   const form = useForm<Input>({
     resolver: zodResolver(quizCreationSchema),
@@ -43,7 +53,24 @@ const CreateQuiz = ({ topic: topicParam }: Props) => {
   });
 
   const onSubmit = async (data: Input) => {
-    alert(data);
+    getQuestions(data, {
+      onError: (error) => {
+        if (error instanceof AxiosError) {
+          if (error.response?.status === 500) {
+            console.log('Error 500');
+          }
+        }
+      },
+      onSuccess: ({ gameId }: { gameId: string }) => {
+        setTimeout(() => {
+          if (form.getValues("type") === "mcq") {
+            router.push(`/play/mcq/${gameId}`);
+          } else if (form.getValues("type") === "open_ended") {
+            router.push(`/play/open-ended/${gameId}`);
+          }
+        }, 2000);
+      },
+    });
   };
   form.watch();
 
@@ -128,7 +155,7 @@ const CreateQuiz = ({ topic: topicParam }: Props) => {
                   <BookOpen className="w-4 h-4 mr-2" /> Open Ended
                 </Button>
               </div>
-              <Button type="submit">
+              <Button disabled={isLoading} type="submit">
                 Submit
               </Button>
             </form>
@@ -139,4 +166,4 @@ const CreateQuiz = ({ topic: topicParam }: Props) => {
   );
 };
 
-export default CreateQuiz;
+export default QuizCreation;
