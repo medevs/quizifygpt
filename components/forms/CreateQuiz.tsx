@@ -19,6 +19,7 @@ import { BookOpen, CopyCheck } from "lucide-react";
 import { Separator } from "../ui/separator";
 import axios, { AxiosError } from "axios";
 import { useMutation } from "@tanstack/react-query";
+import { useToast } from "../ui/use-toast";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -27,6 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import LoadingQuestions from "../LoadingQuestions";
 
 type Props = {
   topic: string;
@@ -34,8 +36,11 @@ type Props = {
 
 type Input = z.infer<typeof quizCreationSchema>;
 
-const QuizCreation = ({ topic: topicParam }: Props) => {
+const CreateQuiz = ({ topic: topicParam }: Props) => {
   const router = useRouter();
+  const [showLoader, setShowLoader] = React.useState(false);
+  const [finishedLoading, setFinishedLoading] = React.useState(false);
+  const { toast } = useToast();
   const { mutate: getQuestions, isLoading } = useMutation({
     mutationFn: async ({ amount, topic, type }: Input) => {
       const response = await axios.post("/api/game", { amount, topic, type });
@@ -53,15 +58,22 @@ const QuizCreation = ({ topic: topicParam }: Props) => {
   });
 
   const onSubmit = async (data: Input) => {
+    setShowLoader(true);
     getQuestions(data, {
       onError: (error) => {
+        setShowLoader(false);
         if (error instanceof AxiosError) {
           if (error.response?.status === 500) {
-            console.log('Error 500');
+            toast({
+              title: "Error",
+              description: "Something went wrong. Please try again later.",
+              variant: "destructive",
+            });
           }
         }
       },
       onSuccess: ({ gameId }: { gameId: string }) => {
+        setFinishedLoading(true);
         setTimeout(() => {
           if (form.getValues("type") === "mcq") {
             router.push(`/play/mcq/${gameId}`);
@@ -73,6 +85,10 @@ const QuizCreation = ({ topic: topicParam }: Props) => {
     });
   };
   form.watch();
+
+  if (showLoader) {
+    return <LoadingQuestions finished={finishedLoading} />;
+  }
 
   return (
     <div className="absolute -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2">
@@ -166,4 +182,4 @@ const QuizCreation = ({ topic: topicParam }: Props) => {
   );
 };
 
-export default QuizCreation;
+export default CreateQuiz;
